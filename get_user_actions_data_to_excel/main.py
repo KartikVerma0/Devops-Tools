@@ -1,88 +1,158 @@
 import json
-import xlsxwriter
+import sys
+import openpyxl
+import requests
+from openpyxl import Workbook
 
-# Function to convert JSON file to Excel
-def json_to_excel(json_file, excel_file):
-    # Read the JSON data from the file
-    with open(json_file, 'r') as f:
-        data = json.load(f)
+def main():
+    excel_file = take_file_input_output()
 
-    # Create a new Excel file and add a worksheet
-    workbook = xlsxwriter.Workbook(excel_file)
-    worksheet = workbook.add_worksheet()
+    fromDate = "2024-10-08"
+    toDate = "2024-10-10"
 
-    # Define the desired order of the headers
+    # Convert the JSON to Excel
+    json_to_excel(excel_file,fromDate,toDate)
+
+def take_file_input_output():
+    if len(sys.argv) != 2:
+        print("Provide name for excel output file")
+        sys.exit(1)
+
+    output_file = sys.argv[1]
+
+    return output_file if output_file.find(".xls") == -1 and output_file.find(".xlsx") == -1 else output_file.split(".") [0]
+
+def login():
+    url = "https://stringsprodapi.azure-api.net/gateway/open/login"
+    payload = json.dumps({
+        "username": "admin@73strings.com",
+        "password": "92pWVu5C",
+        "orgType": "vc"
+    })
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    response = requests.request("POST", url, headers=headers, data=payload)
+
+    if response.headers["X-AUTH-TOKEN"] == (None or ""):
+        print("Failed to login")
+        sys.exit(1)
+    print("Successfully logged in")
+    return response.headers["X-AUTH-TOKEN"]
+
+def fetch_user_action_data(fromDate,toDate):
+    AUTH_TOKEN = login()
+    url = "https://stringsprodapi.azure-api.net/user/api/v1/um/user_action_tracker/get_user_actions"
+
+    payload = json.dumps({
+        "userId": "",
+        "orgId": "",
+        "date": {
+            "fromDate": fromDate,
+            "toDate": toDate
+        }
+    })
+    headers = {
+        'X-AUTH-TOKEN': AUTH_TOKEN,
+        'Content-Type': 'application/json'
+    }
+
+    response = requests.request("POST", url, headers=headers, data=payload)
+
+    data = response.json()
+
+    if "response" not in data:
+        print("Json does not contain response field")
+        sys.exit(1)
+    else:
+        data = data["response"]
+
+    return data
+
+# Function to convert JSON data to Excel
+def json_to_excel(excel_file,fromDate,toDate):
+    data = fetch_user_action_data(fromDate,toDate)
+
+    # Create a new Excel file or load an existing one
+    try:
+        workbook = openpyxl.load_workbook(excel_file + ".xlsx")
+        worksheet = workbook.active
+    except FileNotFoundError:
+        workbook = Workbook()
+        worksheet = workbook.active
+
+    headers, additional_headers = add_headers_in_excel(data, worksheet)
+
+    write_data_to_excel(data, headers, worksheet, additional_headers)
+
+    # Save the workbook
+    workbook.save(excel_file + ".xlsx")
+    print(f"Excel file '{excel_file}' created or updated successfully!")
+
+def add_headers_in_excel(data, worksheet):
     headers = [
         "adminName", "date", "orgName", "adminId", "action", 
         "module", "name", "id", "type", "data", 
         "userName", "userId", "orgId"
     ]
 
-    # Write the headers in the specified order
-    for col_num, header in enumerate(headers):
-        worksheet.write(0, col_num, header)
+    # Write headers only if the first row is empty
+    if worksheet.max_row == 1:
+        for col_num, header in enumerate(headers, start=1):
+            worksheet.cell(row=1, column=col_num, value=header)
 
-    # Keep track of the additional child keys
+    # Collect additional headers from nested data
     additional_headers = []
 
-    # Extract additional headers from nested values
     for item in data:
         for key, value in item.items():
             if isinstance(value, dict):
                 for child_key in value.keys():
-                    new_header = f"{key}.{child_key}"  # Create new header for child keys
+                    new_header = f"{key}.{child_key}"
                     if new_header not in additional_headers:
                         additional_headers.append(new_header)
             elif isinstance(value, list):
                 for index, child_value in enumerate(value):
                     if isinstance(child_value, dict):
                         for child_key in child_value.keys():
-                            new_header = f"{key}[{index}].{child_key}"  # Handle lists with index
+                            new_header = f"{key}[{index}].{child_key}"
                             if new_header not in additional_headers:
                                 additional_headers.append(new_header)
 
-    # Write additional headers
-    for col_num, header in enumerate(additional_headers, start=len(headers)):
-        worksheet.write(0, col_num, header)
+    # Write additional headers if they do not exist
+    for col_num, header in enumerate(additional_headers, start=len(headers) + 1):
+        if worksheet.cell(row=1, column=col_num).value is None:
+            worksheet.cell(row=1, column=col_num, value=header)
 
-    # Write the data rows
-    for row_num, item in enumerate(data, start=1):
-        # Write the main item values
-        for col_num, header in enumerate(headers):
-            value = item.get(header)  # Get value for the current header
-            # Leave empty if value is a dict or list
+    return headers, additional_headers
+
+def write_data_to_excel(data, headers, worksheet, additional_headers):
+    # Start writing data from the first empty row
+    row_start = worksheet.max_row + 1
+
+    for row_num, item in enumerate(data, start=row_start):
+        for col_num, header in enumerate(headers, start=1):
+            value = item.get(header)
             if isinstance(value, (dict, list)):
-                worksheet.write(row_num, col_num, "")  # Keep original column empty
+                worksheet.cell(row=row_num, column=col_num, value="")
             else:
-                worksheet.write(row_num, col_num, value)
+                worksheet.cell(row=row_num, column=col_num, value=value)
 
-        # Write child values from nested objects
-        for col_num, header in enumerate(additional_headers):
+        for col_num, header in enumerate(additional_headers, start=len(headers) + 1):
             key, child_key = header.split('.', 1) if '.' in header else (header.split('[', 1)[0], header.split('.', 1)[-1])
             if '.' in header:
-                # Handle nested dictionary
                 value = item.get(key, {}).get(child_key)
                 if isinstance(value, (dict, list)):
-                    value = json.dumps(value)  # Convert dict or list to string
-            elif '[' in header:  # Handle indexed lists
+                    value = json.dumps(value)
+            elif '[' in header:
                 index = int(header.split('[')[1].split(']')[0])
                 key = header.split('[')[0]
                 value = item.get(key, [])[index] if index < len(item.get(key, [])) else None
                 if isinstance(value, (dict, list)):
-                    value = json.dumps(value)  # Convert dict or list to string
+                    value = json.dumps(value)
             else:
                 value = item.get(header)
 
-            worksheet.write(row_num, col_num + len(headers), value)
+            worksheet.cell(row=row_num, column=col_num, value=value)
 
-    # Close the workbook
-    workbook.close()
-
-    print(f"Excel file '{excel_file}' created successfully!")
-
-# Specify the JSON file and Excel file names
-json_file = 'data2.json'  # Replace with your JSON file name
-excel_file = 'output7.xlsx'  # Desired name for the output Excel file
-
-# Convert the JSON to Excel
-json_to_excel(json_file, excel_file)
+main()
