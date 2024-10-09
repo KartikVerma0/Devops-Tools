@@ -2,7 +2,11 @@ import json
 import sys
 import openpyxl
 import requests
+import os
 from openpyxl import Workbook
+from dotenv import load_dotenv,dotenv_values
+
+load_dotenv()
 
 def main():
     excel_file = take_file_input_output()
@@ -23,10 +27,10 @@ def take_file_input_output():
     return output_file if output_file.find(".xls") == -1 and output_file.find(".xlsx") == -1 else output_file.split(".") [0]
 
 def login():
-    url = "https://stringsprodapi.azure-api.net/gateway/open/login"
+    url = os.getenv("LOGIN_URL")
     payload = json.dumps({
-        "username": "admin@73strings.com",
-        "password": "92pWVu5C",
+        "username": os.getenv("LOGIN_USERNAME"),
+        "password": os.getenv("LOGIN_PWD"),
         "orgType": "vc"
     })
     headers = {
