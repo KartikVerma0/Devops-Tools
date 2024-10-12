@@ -60,7 +60,7 @@ def fetch_user_action_data(fromDate,toDate):
         'X-AUTH-TOKEN': AUTH_TOKEN,
         'Content-Type': 'application/json'
     }
-
+    print("Fetching data")
     response = requests.request("POST", url, headers=headers, data=payload)
 
     data = response.json()
@@ -76,7 +76,7 @@ def fetch_user_action_data(fromDate,toDate):
 # Function to convert JSON data to Excel
 def json_to_excel(excel_file,fromDate,toDate):
     data = fetch_user_action_data(fromDate,toDate)
-
+    print("Writing data to excel")
     # Create a new Excel file or load an existing one
     try:
         workbook = openpyxl.load_workbook(excel_file + ".xlsx")
