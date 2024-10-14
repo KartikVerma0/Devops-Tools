@@ -5,21 +5,24 @@ import requests
 import os
 from openpyxl import Workbook
 from dotenv import load_dotenv,dotenv_values
+from rich.console import Console
+console = Console()
+error_console = Console(stderr=True,style="bold red")
 
 load_dotenv()
 
 def main():
     excel_file = take_file_input_output()
 
-    fromDate = "2024-10-08"
-    toDate = "2024-10-10"
+    fromDate = "2024-10-13"
+    toDate = "2024-10-15"
 
     # Convert the JSON to Excel
     json_to_excel(excel_file,fromDate,toDate)
 
 def take_file_input_output():
     if len(sys.argv) != 2:
-        print("Provide name for excel output file")
+        error_console.log("Provide name for excel output file")
         sys.exit(1)
 
     output_file = sys.argv[1]
@@ -36,16 +39,18 @@ def login():
     headers = {
         'Content-Type': 'application/json'
     }
+    
     response = requests.request("POST", url, headers=headers, data=payload)
 
     if response.headers["X-AUTH-TOKEN"] == (None or ""):
-        print("Failed to login")
+        error_console.log("Failed to login")
         sys.exit(1)
-    print("Successfully logged in")
+    console.log("Successfully logged in")
     return response.headers["X-AUTH-TOKEN"]
 
 def fetch_user_action_data(fromDate,toDate):
-    AUTH_TOKEN = login()
+    with console.status("Logging in..."):
+        AUTH_TOKEN = login()
     url = "https://stringsprodapi.azure-api.net/user/api/v1/um/user_action_tracker/get_user_actions"
 
     payload = json.dumps({
@@ -60,13 +65,13 @@ def fetch_user_action_data(fromDate,toDate):
         'X-AUTH-TOKEN': AUTH_TOKEN,
         'Content-Type': 'application/json'
     }
-    print("Fetching data")
-    response = requests.request("POST", url, headers=headers, data=payload)
+    with console.status("Fetching data"):
+        response = requests.request("POST", url, headers=headers, data=payload)
 
     data = response.json()
 
     if "response" not in data:
-        print("Json does not contain response field")
+        error_console.log("Json does not contain response field")
         sys.exit(1)
     else:
         data = data["response"]
@@ -76,7 +81,6 @@ def fetch_user_action_data(fromDate,toDate):
 # Function to convert JSON data to Excel
 def json_to_excel(excel_file,fromDate,toDate):
     data = fetch_user_action_data(fromDate,toDate)
-    print("Writing data to excel")
     # Create a new Excel file or load an existing one
     try:
         workbook = openpyxl.load_workbook(excel_file + ".xlsx")
@@ -87,11 +91,12 @@ def json_to_excel(excel_file,fromDate,toDate):
 
     headers, additional_headers = add_headers_in_excel(data, worksheet)
 
-    write_data_to_excel(data, headers, worksheet, additional_headers)
+    with console.status("Writing data to excel..."):
+        write_data_to_excel(data, headers, worksheet, additional_headers)
 
     # Save the workbook
     workbook.save(excel_file + ".xlsx")
-    print(f"Excel file '{excel_file}' created or updated successfully!")
+    console.log(f"Excel file '{excel_file}' created or updated successfully!")
 
 def add_headers_in_excel(data, worksheet):
     headers = [
