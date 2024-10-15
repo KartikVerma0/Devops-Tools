@@ -1,0 +1,26 @@
+{
+	"manifest_version": 3,
+	"name": "Select all funds and companies",
+	"description": "If there are a lots of funds and companies, it takes lots of time to select them manually",
+	"version": "1",
+	"action": {
+		"default_popup": "popup.html"
+	},
+	"content_scripts": [
+		{
+			"matches": [
+				"https://aiplatform-uat.73strings.com/uam",
+				"https://aiplatform-eut.73strings.com/uam",
+				"https://aiplatform-us.73strings.com/uam",
+				"https://aiplatform-usa.73strings.com/uam",
+				"https://aiplatform.73strings.com/uam",
+				"https://aiplatform-preprod.73strings.com/uam"
+			],
+			"js": ["contentScript.js"]
+		}
+	],
+	"permissions": [
+		"activeTab",
+		"scripting"
+	]
+}
