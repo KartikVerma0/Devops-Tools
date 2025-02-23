@@ -45,12 +45,13 @@ def login():
     if response.headers["X-AUTH-TOKEN"] == (None or ""):
         error_console.log("Failed to login")
         sys.exit(1)
-    console.log("Successfully logged in")
     return response.headers["X-AUTH-TOKEN"]
 
 def fetch_user_action_data(fromDate,toDate):
     with console.status("Logging in..."):
         AUTH_TOKEN = login()
+    console.log("Successfully logged in")
+    
     url = "https://stringsprodapi.azure-api.net/user/api/v1/um/user_action_tracker/get_user_actions"
 
     payload = json.dumps({
@@ -65,9 +66,14 @@ def fetch_user_action_data(fromDate,toDate):
         'X-AUTH-TOKEN': AUTH_TOKEN,
         'Content-Type': 'application/json'
     }
-    with console.status("Fetching data"):
-        response = requests.request("POST", url, headers=headers, data=payload)
 
+    try:
+        with console.status("Fetching data"):
+            response = requests.request("POST", url, headers=headers, data=payload)
+        console.log("Successfully fetched data")
+    except:
+        error_console.log("Problem fetching data")
+        sys.exit(1)
     data = response.json()
 
     if "response" not in data:
