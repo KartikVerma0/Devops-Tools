@@ -407,9 +407,12 @@ def read_swagger_file():
     """
     console.log("Enter swagger file path")
     file_path = input()
+    file_path = file_path.replace("\\","/")
+    if file_path.index('"') == 0:
+        file_path = file_path.split('"')[1]
     console.log(f"Reading Swagger file from [blue]{file_path}[/blue]...")
     try:
-        with open(file_path, 'r') as file:
+        with open(file_path, 'r', encoding='utf-8') as file:
             console.log("[green]Swagger file read successfully![/green]")
             return json.loads(file.read())
     except FileNotFoundError:
@@ -452,7 +455,7 @@ def update_swagger(info, access_token):
         "name":api_details.get('api_id'),
         "properties": {
             "format": swagger_format,
-            "value": json.dumps(swagger_content),
+            "value": json.dumps(swagger_content,ensure_ascii=False),
             "displayName": api_details.get('displayName'),
             "serviceUrl": api_details.get('serviceUrl'),
             "protocols": api_details.get('protocols'),
@@ -477,46 +480,6 @@ def update_swagger(info, access_token):
         quit()
 
 
-# def update_swagger_config(info, access_token):
-#     """
-#     Updates swagger configs after updating swagger file\n
-#     """
-#     console.log("Updating API config...")
-#     time.sleep(10)
-
-#     headers = {
-#         "Authorization": f"Bearer {access_token}",
-#         "Content-Type": "application/json"
-#     }
-
-#     api_details = info.get('api_details')
-
-#     body = {
-#         "properties": {
-#             "displayName": api_details.get('displayName'),
-#             "serviceUrl": api_details.get('serviceUrl'),
-#             "protocols": api_details.get('protocols'),
-#             "path": api_details.get('path'),
-#             "subscriptionRequired": api_details.get('subscriptionRequired')
-#         }
-#     }
-
-#     console.log(body)
-
-#     with Progress() as progress:
-#         task = progress.add_task("[cyan]Updating Swagger Config in APIM...", total=100)
-
-#         response = requests.patch(info.get('patch_url'), headers=headers, json=body)
-#         progress.update(task, advance=100)
-
-#     if response.status_code >= 200 and response.status_code < 300:
-#         console.log("[green]Swagger config updated successfully![/green]")
-#     else:
-#         console.log(f"[red]Failed to update Swagger Config. Status code: {response.status_code}[/red]")
-#         console.log(f"Response: [red]{response.text}[/red]")
-#         quit()
-
-
 
 # Run the script
 if __name__ == "__main__":
@@ -531,4 +494,3 @@ if __name__ == "__main__":
 
 
     update_swagger(info, access_token)
-    # update_swagger_config(info, access_token)
