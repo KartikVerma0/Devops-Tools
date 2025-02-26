@@ -1,10 +1,10 @@
+#!/c/Users/KartikVerma/AppData/Local/Microsoft/WindowsApps/python
 import requests
 import json
 import os
 from rich.console import Console
 from rich.progress import Progress
 from rich.traceback import install
-import time
 from openapi_spec_validator import validate_spec
 from openapi_spec_validator.exceptions import OpenAPISpecValidatorError
 
@@ -14,68 +14,7 @@ install()
 # Initialize Rich Console
 console = Console()
 
-
-# def select_env():
-#     """
-#     Returns environment details \n
-#     {
-#         "subscription_id",\n
-#         "resource_group",\n
-#         "service_name",\n
-#         "environment"\n
-#     }
-#     """
-#     envs = [
-#         "UAT",
-#         "EUT",
-#         "PRE PROD",
-#         "US PROD",
-#         "US PROD 2",
-#         "EU PROD",
-#         "ACCORD EU PROD"
-#     ]
-
-#     subscription_ids = [
-#         "7c651e19-e4c9-4783-a62b-8ada7a7ed16a",
-#         "fe9b2128-c21d-4fc7-9275-0a012f074412",
-#         "6351b8d5-6fa2-4e42-9100-472d994fc245",
-#         "71e1088e-e5f1-4991-bd18-af1e1926f14d",
-#         "946458f2-1d72-42a5-8cee-fdd8897462a7",
-#         "7bede9ea-32ef-4abd-b2c4-6593809b601d",
-#         "00dd0f57-7fc5-4fd1-88cd-3f685ae21487"
-#     ]
-
-#     resource_groups = [
-#         "73strings_UAT-01",
-#         "73Strings-IT-RG-UAT-West-EU",
-#         "73Strings_wuPreprod_RG",
-#         "US_Production_instance",
-#         "73Strings_USProd-2_RG",
-#         "73Strings-IT-RG-WestEU-Prod",
-#         "accord-euprod-svc-rg"
-#     ]
-
-    
-
-#     console.log("Select the serial number of environment:")
-#     size = len(envs)
-#     for index in range(size):
-#         console.print(f"            {index+1}. {envs[index]}")
-#     env_number = int(input())
-
-#     while True:
-#         if(env_number>size or env_number <= 0):
-#             console.print(f"[red]Invalid environment selected, Enter a valid serial number[/red]")
-#             env_number = int(input())
-#         else:
-#             return {
-#                 "subscription_id":subscription_ids[env_number-1],
-#                 "resource_group": resource_groups[env_number-1],
-#                 "service_name": select_service_names(env_number-1),
-#                 "environment": envs[env_number-1]
-#             }
-
-def select_env_clone_test():
+def select_env():
     """
     Returns environment details \n
     {
@@ -202,24 +141,30 @@ def get_info(access_token):
         "api_details"
     }
     """
-    # info = select_env()
-    info = select_env_clone_test()
+    env_details = select_env()
 
     # Replace these variables with your Azure details
-    api_details = get_api_details(info,access_token)
+    api_details = get_api_details(env_details,access_token)
     api_id = api_details.get('api_id')
-    swagger_file = get_swagger_file(info.get('environment'),api_details.get('path'))
+    swagger_file = get_swagger_file(env_details.get('environment'),api_details.get('path'))
 
     # Azure management endpoint
-    url = f"https://management.azure.com/subscriptions/{info.get('subscription_id')}/resourceGroups/{info.get('resource_group')}/providers/Microsoft.ApiManagement/service/{info.get('service_name')}/apis/{api_id}?import=true&api-version=2022-09-01-preview"
-    patch_url = f"https://management.azure.com/subscriptions/{info.get('subscription_id')}/resourceGroups/{info.get('resource_group')}/providers/Microsoft.ApiManagement/service/{info.get('service_name')}/apis/{api_id}?api-version=2023-03-01-preview"
-    # for uat url shoule be
-    #https://management.azure.com/subscriptions/7c651e19-e4c9-4783-a62b-8ada7a7ed16a/resourceGroups/73strings_UAT-01/providers/Microsoft.ApiManagement/service/stringsuatapi/apis/debt-model-api-documentation?import=true&api-version=2022-09-01-preview
+    url = f"https://management.azure.com/subscriptions/{env_details.get('subscription_id')}/resourceGroups/{env_details.get('resource_group')}/providers/Microsoft.ApiManagement/service/{env_details.get('service_name')}/apis/{api_id}?import=true&api-version=2022-09-01-preview"
+    patch_url = f"https://management.azure.com/subscriptions/{env_details.get('subscription_id')}/resourceGroups/{env_details.get('resource_group')}/providers/Microsoft.ApiManagement/service/{env_details.get('service_name')}/apis/{api_id}?api-version=2023-03-01-preview"
+
+    # Detect the format dynamically
+    try:
+        swagger_format = detect_swagger_format(swagger_file)
+    except ValueError as e:
+        console.log(f"[red]{e} Exiting...[/red]")
+        quit()
+
     return {
         "url":url,
         "patch_url":patch_url,
         "swagger_file":swagger_file,
-        "api_details":api_details
+        "api_details":api_details,
+        "swagger_format": swagger_format
     }
 
 def get_endpoint(env,api_suffix):
@@ -304,6 +249,9 @@ def get_swagger_file(env,api_suffix):
     if response.status_code == 200:
         swagger_file = response.json()
         if validate_swagger_file(swagger_file):
+            # writing fetched swagger to a file for testing
+            with open("fetched_swagger.txt", "w") as file:
+                file.write(str(swagger_file))
             return swagger_file
         else:
             console.log("[red]Invalid Swagger file fetched. Exiting...[/red]")
@@ -319,8 +267,6 @@ def get_swagger_file(env,api_suffix):
             console.log("[red]Invalid Swagger file provided. Exiting...[/red]")
             quit()
 
-
-    # return swagger content
 
 def validate_swagger_file(swagger_content):
     """
@@ -433,16 +379,7 @@ def detect_swagger_format(swagger_content):
 
 
 # Main function to update Swagger in APIM
-def update_swagger(info, access_token):
-    
-    swagger_content = info.get('swagger_file')
-
-    # Detect the format dynamically
-    try:
-        swagger_format = detect_swagger_format(swagger_content)
-    except ValueError as e:
-        console.log(f"[red]{e} Exiting...[/red]")
-        quit()
+def update_swagger(info, access_token):   
 
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -454,8 +391,8 @@ def update_swagger(info, access_token):
     body = {
         "name":api_details.get('api_id'),
         "properties": {
-            "format": swagger_format,
-            "value": json.dumps(swagger_content,ensure_ascii=False),
+            "format": info.get('swagger_format'),
+            "value": json.dumps(info.get('swagger_file'),ensure_ascii=False),
             "displayName": api_details.get('displayName'),
             "serviceUrl": api_details.get('serviceUrl'),
             "protocols": api_details.get('protocols'),
