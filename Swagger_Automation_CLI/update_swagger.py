@@ -59,6 +59,11 @@ def select_env():
             "env":"ACCORD EU PROD",
             "subscription_id":"00dd0f57-7fc5-4fd1-88cd-3f685ae21487",
             "resource_group":"accord-euprod-svc-rg"
+        },
+        {
+            "env":"ACCORD UAT",
+            "subscription_id":"a1765757-982b-4940-81d6-f06a52f22935",
+            "resource_group":"accord-uat-svc-rg"
         }
     ]
     
@@ -112,6 +117,9 @@ def select_service_names(env_number):
         ],
         [
             "accord-euprod-api",
+        ],
+        [
+            "accord-uat-api",
         ]
     ]
 
