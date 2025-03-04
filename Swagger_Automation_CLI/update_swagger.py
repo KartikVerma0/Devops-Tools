@@ -64,6 +64,11 @@ def select_env():
             "env":"ACCORD UAT",
             "subscription_id":"a1765757-982b-4940-81d6-f06a52f22935",
             "resource_group":"accord-uat-svc-rg"
+        },
+        {
+            "env":"Automation Testing",
+            "subscription_id":"7d69fe92-15ec-4013-9b31-35fdbe8aca85",
+            "resource_group":"Training-RG"
         }
     ]
     
@@ -120,6 +125,9 @@ def select_service_names(env_number):
         ],
         [
             "accord-uat-api",
+        ],
+        [
+            "swagger-automation-apim",
         ]
     ]
 
@@ -172,7 +180,8 @@ def get_info(access_token):
         "patch_url":patch_url,
         "swagger_file":swagger_file,
         "api_details":api_details,
-        "swagger_format": swagger_format
+        "swagger_format": swagger_format,
+        "environment": api_details.get('environment')
     }
 
 def get_endpoint(env,api_suffix):
@@ -239,22 +248,23 @@ def get_swagger_file(env,api_suffix):
     """
     Fetches swagger file from endpoints, if swagger endpoint doesn't exists then read swagger from file
     """
+    if env != "Automation Testing":
+        # first try making requests to endpoint
+        endpoint = get_endpoint(env,api_suffix)
+        platform_access_token = get_platform_access_token(env)
 
-    # first try making requests to endpoint
-    endpoint = get_endpoint(env,api_suffix)
-    platform_access_token = get_platform_access_token(env)
+        if not platform_access_token:
+                console.log("[red]Failed to get platform access token.[/red]")
+                return None
 
-    if not platform_access_token:
-            console.log("[red]Failed to get platform access token.[/red]")
-            return None
+        headers = {
+            "X-AUTH-TOKEN": platform_access_token
+        }
 
-    headers = {
-        "X-AUTH-TOKEN": platform_access_token
-    }
+        console.log("Fetching swagger file...")
+        response = requests.get(endpoint,headers=headers)
 
-    console.log("Fetching swagger file...")
-    response = requests.get(endpoint,headers=headers)
-    if response.status_code == 200:
+    if env != "Automation Testing" and response.status_code == 200:
         swagger_file = response.json()
         if validate_swagger_file(swagger_file):
             # writing fetched swagger to a file for testing
@@ -266,7 +276,8 @@ def get_swagger_file(env,api_suffix):
             quit()
     else:
         # if we get 404 take swagger path as input to read file
-        console.log(f"[yellow]Failed to fetch Swagger file from endpoint. Status: {response.status_code}[/yellow]")
+        status_code = 404 if env == "Automation Testing" else response.status_code
+        console.log(f"[yellow]Failed to fetch Swagger file from endpoint. Status: {status_code}[/yellow]")
         console.log("Reading Swagger file from local path...")
         swagger_file = read_swagger_file()
         if validate_swagger_file(swagger_file):
@@ -333,6 +344,7 @@ def get_api_details(info,access_token):
                 "path":apis[api_number-1].get('properties').get('path'),
                 "protocols":apis[api_number-1].get('properties').get('protocols'),
                 "subscriptionRequired":apis[api_number-1].get('properties').get('subscriptionRequired'),
+                "environment": info.get('environment')
             }
 
 
@@ -362,8 +374,11 @@ def read_swagger_file():
     console.log("Enter swagger file path")
     file_path = input()
     file_path = file_path.replace("\\","/")
-    if file_path.index('"') == 0:
-        file_path = file_path.split('"')[1]
+    try:
+        if file_path.index('"') == 0:
+            file_path = file_path.split('"')[1]
+    except ValueError:
+        file_path = file_path
     console.log(f"Reading Swagger file from [blue]{file_path}[/blue]...")
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
@@ -412,7 +427,7 @@ def update_swagger(info, access_token):
     }
 
     with Progress() as progress:
-        task = progress.add_task("[cyan]Updating Swagger in APIM...", total=100)
+        task = progress.add_task(f"[cyan]Updating Swagger in {info.get('environment')} ...", total=100)
 
         response = requests.put(info.get('url'), headers=headers, json=body)
         progress.update(task, advance=100)
