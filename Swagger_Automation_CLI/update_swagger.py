@@ -2,6 +2,8 @@
 import requests
 import json
 import os
+import shutil
+import sys
 from rich.console import Console
 from rich.progress import Progress
 from rich.traceback import install
@@ -355,6 +357,12 @@ def get_access_token():
     """
     Returns access token from azure
     """
+
+    # Check if 'az' command exists
+    if not shutil.which("az"):
+        console.log("[red]Azure CLI is not installed. Please install it from:[/red] https://aka.ms/installazurecliwindows")
+        sys.exit(1)  # Stop execution
+
     console.log("Fetching Azure access token...")
     try:
         result = os.popen("az account get-access-token --query accessToken --output tsv").read().strip()
@@ -364,7 +372,8 @@ def get_access_token():
         return result
     except Exception as e:
         console.log(f"[red]Error getting access token: {e}[/red]")
-        return None
+        sys.exit(1)
+        # return None
 
 # Function to read the Swagger (OpenAPI) file
 def read_swagger_file():
