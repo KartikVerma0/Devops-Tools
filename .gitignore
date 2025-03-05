@@ -6,3 +6,4 @@
 **/*.pem
 **/*.txt
 **/*.yaml
+!Swagger_Automation_CLI/requirements.txt
