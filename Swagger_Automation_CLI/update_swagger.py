@@ -80,11 +80,17 @@ def select_env():
     for index in range(size):
         console.print(f"            {index+1}. {envs[index].get('env')}")
     env_number = int(input())
+    selection = verify_selection()
 
     while True:
-        if(env_number>size or env_number <= 0):
+        if not selection:
+            console.log(f"Enter the serial number of environment")
+            env_number = int(input())
+            selection = verify_selection()
+        elif(env_number>size or env_number <= 0):
             console.print(f"[red]Invalid environment selected, Enter a valid serial number[/red]")
             env_number = int(input())
+            selection = verify_selection()
         else:
             return {
                 "subscription_id":envs[env_number-1].get('subscription_id'),
@@ -93,6 +99,15 @@ def select_env():
                 "environment": envs[env_number-1].get('env')
             }
 
+def verify_selection():
+    console.log("Do you want to confirm your selection? (Y/N)")
+    selection = input()
+
+    if selection.lower() == "n":
+        return False
+    elif selection == "" or selection.lower() == "y":
+        return True
+    return False
 
 def select_service_names(env_number):
     """
@@ -140,10 +155,17 @@ def select_service_names(env_number):
         console.print(f"            {_index+1}. {_service}")
         _index+=1
     service_number = int(input())
+    selection = verify_selection()
+
     while True:
-        if(service_number>size or service_number <= 0):
+        if not selection:
+            console.log(f"Enter the serial number of service")
+            service_number = int(input())
+            selection = verify_selection()
+        elif(service_number>size or service_number <= 0):
             console.print(f"[red]Invalid service selected, Enter a valid serial number[/red]")
             service_number = int(input())
+            selection = verify_selection()
         else:
             return service_names[env_number][service_number-1]
 
@@ -198,6 +220,7 @@ def get_endpoint(env,api_suffix):
         "US PROD 2": f"http://20.253.30.209/{api_suffix}/v2/api-docs",
         "EU PROD": f"http://52.236.148.125/{api_suffix}/v2/api-docs",
         "ACCORD EU PROD": f"http://172.211.182.240/{api_suffix}/v2/api-docs",
+        "ACCORD UAT": f"http://9.163.203.4/{api_suffix}/v2/api-docs",
     }
         
 
@@ -209,6 +232,7 @@ def get_endpoint(env,api_suffix):
         "US PROD 2": f"http://20.253.30.209/dcf/api-docs",
         "EU PROD": f"http://52.236.148.125/dcf/api-docs",
         "ACCORD EU PROD": f"http://172.211.182.240/dcf/api-docs",
+        "ACCORD UAT": f"http://9.163.203.4/dcf/api-docs",
     }        
 
     if api_suffix == "dcf":
@@ -228,6 +252,7 @@ def get_platform_access_token(env):
         "US PROD 2": f"https://strings-us-prod2.azure-api.net/gateway/open/login",
         "EU PROD": f"https://stringsprodapi.azure-api.net/gateway/open/login",
         "ACCORD EU PROD": f"https://accord-euprod-api.azure-api.net/gateway/open/login",
+        "ACCORD UAT": f"https://accord-uat-api.azure-api.net/gateway/open/login",
     }
 
     login_url = login_urls.get(env)
@@ -350,6 +375,47 @@ def get_api_details(info,access_token):
             }
 
 
+def check_azure_login():
+    """
+    Checks if the user is logged into Azure. If not, logs in.
+    """
+    console.log("Checking Azure login status...")
+
+    try:
+        result = os.popen("az account show").read().strip()
+        if not result:
+            raise ValueError("No output from 'az account show'.")
+        
+        account_info = json.loads(result)
+        if "id" in account_info:
+            console.log(f"[green]Logged into Azure as: {account_info['user']['name']}[/green]")
+            return True
+
+    except Exception:
+        console.log("[yellow]User is not logged into Azure. Attempting to log in...[/yellow]")
+
+    return azure_login()
+
+def azure_login():
+    """
+    Logs into Azure CLI.
+    """
+    console.log("[blue]Opening browser for Azure login...[/blue]")
+    
+    try:
+        os.system("az login")  # Runs Azure CLI login
+        result = os.popen("az account show").read().strip()
+        account_info = json.loads(result)
+
+        if "id" in account_info:
+            console.log(f"[green]Successfully logged into Azure as: {account_info['user']['name']}[/green]")
+            return True
+        else:
+            raise ValueError("Login was unsuccessful.")
+
+    except Exception:
+        console.log("[red]Failed to log into Azure. Please run 'az login' manually and retry.[/red]")
+        sys.exit(1)
 
 
 # Function to get Azure access token using Azure CLI
@@ -362,6 +428,8 @@ def get_access_token():
     if not shutil.which("az"):
         console.log("[red]Azure CLI is not installed. Please install it from:[/red] https://aka.ms/installazurecliwindows")
         sys.exit(1)  # Stop execution
+
+    check_azure_login()
 
     console.log("Fetching Azure access token...")
     try:
