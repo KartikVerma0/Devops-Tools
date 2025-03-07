@@ -1,4 +1,4 @@
-#!/c/Users/KartikVerma/AppData/Local/Microsoft/WindowsApps/python
+#!/usr/local/bin/python
 import requests
 import json
 import os
@@ -358,11 +358,16 @@ def get_api_details(info,access_token):
         console.log(f"  {_index+1}. {apis[_index].get('properties').get('displayName')}")
     
     api_number = int(input())
-
+    selection = verify_selection()
     while True:
-        if(api_number>count or api_number <= 0):
-            console.print(f"[red]Invalid environment selected, Enter a valid serial number[/red]")
+        if not selection:
+            console.log(f"Enter the serial number of service")
             api_number = int(input())
+            selection = verify_selection()
+        elif(api_number>count or api_number <= 0):
+            console.print(f"[red]Invalid API selected, Enter a valid serial number[/red]")
+            api_number = int(input())
+            selection = verify_selection()
         else:
             return {
                 "api_id":apis[api_number-1].get('name'),
