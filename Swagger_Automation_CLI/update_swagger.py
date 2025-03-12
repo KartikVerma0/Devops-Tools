@@ -275,7 +275,7 @@ def get_swagger_file(env,api_suffix):
     """
     Fetches swagger file from endpoints, if swagger endpoint doesn't exists then read swagger from file
     """
-    if env != "Automation Testing":
+    if env != "Automation Testing" and api_suffix != "":
         # first try making requests to endpoint
         endpoint = get_endpoint(env,api_suffix)
         platform_access_token = get_platform_access_token(env)
@@ -291,7 +291,7 @@ def get_swagger_file(env,api_suffix):
         console.log("Fetching swagger file...")
         response = requests.get(endpoint,headers=headers)
 
-    if env != "Automation Testing" and response.status_code == 200:
+    if env != "Automation Testing" and api_suffix != "" and response.status_code == 200:
         swagger_file = response.json()
         if validate_swagger_file(swagger_file):
             # writing fetched swagger to a file for testing
@@ -303,7 +303,7 @@ def get_swagger_file(env,api_suffix):
             quit()
     else:
         # if we get 404 take swagger path as input to read file
-        status_code = 404 if env == "Automation Testing" else response.status_code
+        status_code = 404 if env == "Automation Testing" or api_suffix == "" else response.status_code
         console.log(f"[yellow]Failed to fetch Swagger file from endpoint. Status: {status_code}[/yellow]")
         console.log("Reading Swagger file from local path...")
         swagger_file = read_swagger_file()
